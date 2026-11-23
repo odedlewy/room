@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<!-- בדיקת תקשורת טלפונים–חדר אימרסיבי · © 2026 עודד לוי · כל הזכויות שמורות -->
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="author" content="© 2026 עודד לוי · כל הזכויות שמורות">
+<title>בדיקת תקשורת – החדר והטלפונים</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@ably/pubsub-device@3.2.0/dist/cdn/ably.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
+<style>
+* { box-sizing:border-box; }
+html, body { margin:0; height:100%; font-family:Heebo,"Arial Hebrew","Segoe UI",Arial,sans-serif; user-select:none; -webkit-user-select:none; -webkit-tap-highlight-color:transparent; }
+.hidden { display:none !important; }
+button { font-family:inherit; cursor:pointer; }
+
+/* ===== קירות ===== */
+body.wallmode { background:#000; overflow:hidden; }
+#stage { position:absolute; top:0; left:0; width:5760px; height:1080px; transform-origin:0 0; }
+.wall { position:absolute; top:0; width:1920px; height:1080px; overflow:hidden; background:linear-gradient(#33496f,#22334f); color:#fff; touch-action:none; }
+#w1 { left:0; } #w2 { left:1920px; } #w3 { left:3840px; }
+.floor { position:absolute; left:0; right:0; top:950px; bottom:0; background:#141f35; z-index:0; }
+.wtitle { position:absolute; top:0; left:0; right:0; height:110px; display:flex; align-items:center; justify-content:center; font-size:56px; font-weight:800; color:#f2c14e; background:rgba(0,0,0,.2); z-index:3; pointer-events:none; }
+.wsub { font-size:34px; color:#cfd8ea; font-weight:400; margin-inline-start:24px; }
+.layer { position:absolute; inset:0; z-index:1; }
+.panel { position:absolute; z-index:2; background:rgba(20,31,53,.82); border-radius:24px; padding:22px 30px; pointer-events:none; }
+.panel h2 { margin:0 0 12px; font-size:42px; color:#f2c14e; }
+.copy { position:absolute; bottom:12px; left:0; right:0; text-align:center; font-size:22px; color:rgba(255,255,255,.35); pointer-events:none; z-index:3; }
+.dot { position:absolute; width:150px; height:150px; border-radius:50%; border:6px solid #fff; display:flex; align-items:center; justify-content:center; text-align:center; font-size:30px; font-weight:800; color:#fff; text-shadow:0 2px 4px #000; animation:pop .35s ease-out, fade 1.5s ease-in 7s forwards; pointer-events:none; }
+.dot.touch { background:rgba(255,255,255,.25); border-style:dashed; }
+@keyframes pop { from { transform:scale(.2); } to { transform:scale(1); } }
+@keyframes fade { to { opacity:0; } }
+.cur { position:absolute; width:110px; height:110px; margin:-55px 0 0 -55px; border-radius:50%; border:8px solid; background:rgba(255,255,255,.15); pointer-events:none; transition:opacity .4s; }
+.cur span { position:absolute; top:112px; left:50%; transform:translateX(-50%); white-space:nowrap; font-size:30px; font-weight:800; text-shadow:0 2px 4px #000; }
+
+/* קיר אמצע */
+#qrbox { left:120px; top:140px; width:640px; text-align:center; }
+#qr { background:#fff; border-radius:18px; width:400px; height:400px; margin:0 auto 10px; display:flex; align-items:center; justify-content:center; color:#222; font-size:30px; }
+#qr svg { width:372px; height:372px; }
+.url { direction:ltr; font-size:40px; font-weight:600; color:#fff; }
+.codeline { font-size:40px; margin-top:6px; }
+.codeline b { font-size:76px; color:#f2c14e; letter-spacing:6px; }
+#checks { right:90px; top:140px; width:1000px; }
+.row { display:flex; justify-content:space-between; align-items:center; font-size:32px; height:46px; border-bottom:1px solid rgba(255,255,255,.08); }
+.row .v { font-weight:600; color:#f2c14e; unicode-bidi:plaintext; }
+.btns { position:absolute; top:810px; left:180px; right:180px; display:flex; justify-content:space-between; z-index:4; }
+.bt { height:110px; min-width:380px; padding:0 34px; border:none; border-radius:22px; font-size:42px; font-weight:800; background:#4a6596; color:#fff; box-shadow:0 8px 0 #2c3e60; }
+.bt.gold { background:#f2c14e; color:#1b2944; box-shadow:0 8px 0 #b08a2a; }
+.bt:active, .bt.pressed { transform:translateY(6px); box-shadow:0 2px 0 #2c3e60; }
+.bt.armed { background:#e04848; box-shadow:0 8px 0 #962c2c; color:#fff; }
+#pollbox { left:120px; top:140px; width:640px; height:640px; }
+#w2.rep .panel { display:none; }
+.pbar { display:flex; align-items:center; gap:18px; height:96px; font-size:40px; font-weight:800; }
+.pbar i { display:block; height:64px; border-radius:12px; min-width:8px; transition:width .3s; }
+#report { position:absolute; top:110px; left:0; right:0; height:710px; z-index:5; background:#1b2944; padding:16px 60px; font-size:25px; line-height:1.3; white-space:pre-wrap; column-count:2; column-gap:70px; column-fill:auto; overflow:hidden; unicode-bidi:plaintext; }
+#reportClose { position:absolute; z-index:6; top:830px; left:770px; }
+/* טבלת טלפונים */
+#phones { right:60px; top:140px; width:1500px; }
+table { border-collapse:collapse; width:100%; font-size:30px; }
+th { color:#f2c14e; text-align:right; font-weight:600; padding:4px 10px; }
+td { padding:4px 10px; border-top:1px solid rgba(255,255,255,.08); unicode-bidi:plaintext; }
+td.off { opacity:.4; }
+#log { left:60px; top:140px; width:1300px; height:780px; overflow:hidden; }
+#logl div { font-size:28px; line-height:1.55; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; unicode-bidi:plaintext; }
+.toast { position:absolute; top:130px; left:50%; transform:translateX(-50%); background:#f2c14e; color:#1b2944; font-size:40px; font-weight:800; padding:16px 40px; border-radius:18px; z-index:7; pointer-events:none; }
+#keys { position:absolute; top:130px; left:50%; transform:translateX(-50%); z-index:8; background:#1b2944; border:3px solid #f2c14e; border-radius:20px; padding:20px 40px; font-size:32px; line-height:1.6; pointer-events:none; }
+
+/* ===== טלפון ===== */
+body.phonemode { background:linear-gradient(#33496f,#22334f); color:#fff; min-height:100%; }
+#phone { max-width:520px; margin:0 auto; padding:16px; }
+#phone h1 { font-size:26px; color:#f2c14e; text-align:center; margin:6px 0 14px; }
+.ps label { display:block; font-size:18px; margin:14px 0 6px; }
+.ps input { width:100%; font-size:24px; padding:12px; border-radius:12px; border:none; text-align:center; font-family:inherit; }
+.wallpick { display:flex; gap:8px; }
+.wallpick button { flex:1; font-size:20px; padding:16px 4px; border-radius:12px; border:3px solid transparent; background:#4a6596; color:#fff; font-weight:600; }
+.wallpick button.sel { border-color:#f2c14e; background:#5d7bb0; }
+.big { width:100%; margin-top:20px; font-size:24px; font-weight:800; padding:16px; border:none; border-radius:14px; background:#f2c14e; color:#1b2944; box-shadow:0 5px 0 #b08a2a; }
+.big:disabled { opacity:.5; }
+.sec { background:#4a6596; color:#fff; box-shadow:0 5px 0 #2c3e60; }
+#p-err { min-height:28px; margin-top:12px; text-align:center; font-size:18px; color:#ffd6d6; }
+.bar { display:flex; justify-content:space-between; align-items:center; font-size:17px; background:rgba(0,0,0,.2); border-radius:12px; padding:8px 12px; }
+.led { display:inline-block; width:14px; height:14px; border-radius:50%; background:#888; margin-inline-end:6px; vertical-align:middle; }
+.led.on { background:#3fbf7f; } .led.off { background:#e04848; }
+.colors { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px; }
+.colors button { height:76px; border-radius:14px; border:3px solid rgba(255,255,255,.6); }
+.colors button:active { transform:scale(.94); }
+#pad { margin-top:14px; height:220px; border-radius:16px; background:rgba(255,255,255,.08); border:2px dashed rgba(255,255,255,.4); display:flex; align-items:center; justify-content:center; text-align:center; font-size:17px; color:#cfd8ea; touch-action:none; padding:10px; }
+.hint { font-size:15px; color:#cfd8ea; text-align:center; margin-top:8px; }
+#p-poll .colors button { height:120px; }
+#p-rep textarea { width:100%; height:320px; font-size:13px; direction:rtl; border-radius:10px; }
+.pcopy { text-align:center; font-size:13px; color:rgba(255,255,255,.45); margin-top:22px; }
+</style>
+</head>
+<body>
+
+<!-- ===== מסך הקירות ===== -->
+<div id="stage" class="hidden">
+  <div class="wall" id="w1">
+    <div class="wtitle">קיר שמאל<span class="wsub">טלפונים מחוברים</span></div>
+    <div class="floor"></div>
+    <div class="layer" data-w="0"></div>
+    <div class="panel" id="phones">
+      <table><thead><tr><th>שם</th><th>מכשיר</th><th>קיר</th><th>ערוץ</th><th>זמן תגובה</th><th>הכי איטי</th><th>הודעות</th><th>ניתוקים</th></tr></thead><tbody id="ptb"></tbody></table>
+      <div id="pempty" style="font-size:32px;color:#cfd8ea;margin-top:10px">עדיין אין טלפונים מחוברים</div>
+    </div>
+  </div>
+  <div class="wall" id="w2">
+    <div class="wtitle">בדיקת תקשורת: טלפונים וחדר<span class="wsub" id="clock"></span></div>
+    <div class="floor"></div>
+    <div class="layer" data-w="1"></div>
+    <div class="panel" id="qrbox">
+      <div id="qr">טוען...</div>
+      <div style="font-size:34px">סרקו את הקוד, או היכנסו לכתובת:</div>
+      <div class="url" id="url"></div>
+      <div class="codeline">ותקלידו את הקוד <b id="code">----</b></div>
+    </div>
+    <div class="panel hidden" id="pollbox">
+      <h2 id="pollh">שאלה נשלחה לטלפונים</h2>
+      <div id="pollbars"></div>
+      <div id="pollinfo" style="font-size:32px;margin-top:14px;color:#cfd8ea"></div>
+    </div>
+    <div class="panel" id="checks"><h2>תוצאות הבדיקה</h2><div id="chk"></div></div>
+    <div class="btns" id="btns">
+      <button class="bt gold" id="bPoll">שאלה לטלפונים</button>
+      <button class="bt" id="bRep">דוח מלא</button>
+      <button class="bt" id="bClear">ניקוי הקירות</button>
+    </div>
+    <div id="report" class="hidden"></div>
+    <button class="bt gold hidden" id="reportClose">סגירת הדוח</button>
+    <div class="copy">© 2026 עודד לוי · כל הזכויות שמורות</div>
+  </div>
+  <div class="wall" id="w3">
+    <div class="wtitle">קיר ימין<span class="wsub">יומן אירועים</span></div>
+    <div class="floor"></div>
+    <div class="layer" data-w="2"></div>
+    <div class="panel" id="log"><div id="logl"></div></div>
+  </div>
+  <div id="keys" class="hidden">0 – שלושת הקירות · 1/2/3 – קיר אחד<br>F – מסך מלא · R – טעינה מחדש<br>P – שאלה לטלפונים · D – דוח מלא<br>T – הדמיית 3 טלפונים (בדיקה בלבד) · H – הסתרה</div>
+</div>
+
+<!-- ===== מסך הטלפון ===== -->
+<div id="phone" class="hidden">
+  <h1>בדיקת תקשורת עם החדר</h1>
+  <div class="ps" id="p-join">
+    <label>הקוד שעל הקיר</label>
+    <input id="p-code" inputmode="numeric" maxlength="4" autocomplete="off">
+    <label>השם שלכם</label>
+    <input id="p-name" maxlength="12" autocomplete="off">
+    <label>מול איזה קיר אתם?</label>
+    <div class="wallpick" id="p-walls"><button data-w="2">ימין</button><button data-w="1" class="sel">אמצע</button><button data-w="0">שמאל</button></div>
+    <button class="big" id="p-go">התחברות</button>
+    <div id="p-err"></div>
+  </div>
+  <div class="ps hidden" id="p-main">
+    <div class="bar"><span><span class="led" id="p-led"></span><b id="p-me"></b> · <span id="p-wl"></span></span><span id="p-rtt">זמן תגובה: –</span></div>
+    <div class="hint">לחצו על צבע, ועיגול יופיע על הקיר שבחרתם</div>
+    <div class="colors" id="p-colors"></div>
+    <div id="pad">גררו כאן את האצבע,<br>ונקודה בצבע שלכם תזוז על הקיר</div>
+    <div class="wallpick" id="p-walls2" style="margin-top:14px"><button data-w="2">ימין</button><button data-w="1">אמצע</button><button data-w="0">שמאל</button></div>
+    <div class="hint" id="p-diag"></div>
+  </div>
+  <div class="ps hidden" id="p-poll">
+    <h1 style="font-size:30px">בחרו צבע!</h1>
+    <div class="colors" id="p-pollc" style="grid-template-columns:1fr 1fr"></div>
+  </div>
+  <div class="ps hidden" id="p-rep">
+    <h1>דוח הבדיקה</h1>
+    <textarea id="p-reptxt" readonly></textarea>
+    <button class="big" id="p-repcopy">העתקה</button>
+    <button class="big sec" id="p-repclose">חזרה</button>
+  </div>
+  <div class="pcopy">© 2026 עודד לוי · כל הזכויות שמורות</div>
+</div>
+
+<script>
+/* בדיקת תקשורת · © 2026 עודד לוי · כל הזכויות שמורות */
+'use strict';
+const ABLY_KEY = 'vL085Q.1JUw5w:HUpVZFcB748qPlSMjFPHAavjrmX5cfvCqKChNEgwbsw';
+const PHONE_URL = 'https://odedlewy.github.io/room/';
+const LIMIT = 950;
+const COLORS = ['#e04848', '#3fbf7f', '#3d8bfd', '#f2c14e', '#b06cf0', '#ff8a3d'];
+const WALL_NAMES = ['שמאל', 'אמצע', 'ימין'];
+const params = new URLSearchParams(location.search);
+const LOCAL = params.has('local');
+const IS_PHONE = params.has('tel') || (/github\.io$/.test(location.hostname) && !params.has('kir'));
+const $ = id => document.getElementById(id);
+const now = () => performance.now();
+const med = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+const hhmm = () => new Date().toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+const ms = v => v == null ? '–' : Math.round(v) + ' מ״ש';
+
+function deviceInfo() {
+  const ua = navigator.userAgent;
+  let dev = /iPhone/.test(ua) ? 'אייפון' : /iPad/.test(ua) ? 'אייפד' : /Android/.test(ua) ? 'אנדרואיד' : /Windows/.test(ua) ? 'חלונות' : /Mac/.test(ua) ? 'מק' : /Linux/.test(ua) ? 'לינוקס' : 'אחר';
+  let br = /SamsungBrowser/.test(ua) ? 'סמסונג' : /Edg\//.test(ua) ? 'אדג׳' : /OPR\//.test(ua) ? 'אופרה' : /Firefox|FxiOS/.test(ua) ? 'פיירפוקס' : /CriOS|Chrome\//.test(ua) ? 'כרום' : /Safari/.test(ua) ? 'ספארי' : 'אחר';
+  const v = (ua.match(/(?:Chrome|CriOS|Firefox|FxiOS|Version|Edg|SamsungBrowser)\/(\d+)/) || [])[1];
+  if (/WhatsApp|FBAN|FBAV|Instagram|Line\//.test(ua)) br += ' בתוך יישומון';
+  return { dev, br: br + (v ? ' ' + v : ''), ua };
+}
+const TR_NAMES = { web_socket:'ווב-סוקט', xhr_polling:'משיכה חוזרת', comet:'משיכה חוזרת' };
+function transportOf(rt) {
+  try { const t = rt.connection.connectionManager.activeProtocol.getTransport(); return { name: TR_NAMES[t.shortName] || t.shortName, host: rt.connection.connectionManager.host || '' }; }
+  catch (_) { return { name: '?', host: '' }; }
+}
+
+/* ================= שכבת חיבור ================= */
+function ablyClient(clientId) {
+  return AblyPubSub.createClient({ key: ABLY_KEY, clientId, echoMessages: false, disconnectedRetryTimeout: 3000 });
+}
+// מארח (הקירות): מקבל מכולם בערוץ אחד, עונה לכל טלפון בערוץ פרטי, ומשדר לכולם בערוץ משותף
+function makeHost(code, h) {
+  const base = 'game:r' + code;
+  if (LOCAL) {
+    const bc = new BroadcastChannel('rt-' + code);
+    bc.onmessage = ev => { const m = ev.data; if (m && m.to === 'host') h.onMsg(m.from, m.d); };
+    setTimeout(() => h.onReady({ name:'מקומי', host:'' }, 0), 30);
+    return { sendTo:(pid, o) => bc.postMessage({ to:pid, d:o }), broadcast:o => bc.postMessage({ to:'*', d:o }), ping:async () => 0, close(){ bc.close(); } };
+  }
+  if (typeof AblyPubSub === 'undefined') { h.onError('ספריית התקשורת לא נטענה'); return null; }
+  const t0 = now();
+  const rt = ablyClient('wall-' + Math.random().toString(36).slice(2, 8));
+  const main = rt.channels.get(base), all = rt.channels.get(base + ':all'), pres = rt.channels.get(base + ':presence');
+  const outs = {};
+  let ready = false;
+  const timer = setTimeout(() => { if (!ready) h.onError('אין חיבור לשרת אחרי 15 שניות'); }, 15000);
+  rt.connection.on(st => h.onState(st.current, st.reason ? (st.reason.code + ' ' + st.reason.message) : ''));
+  rt.connection.once('connected', async () => {
+    const tConn = now() - t0;
+    try {
+      const members = await pres.presence.get();
+      if (members.some(m => m.data && m.data.host)) { h.onError('taken'); return; }
+      await pres.presence.enter({ host:true });
+      await main.subscribe('up', msg => { const pid = String(msg.clientId || '').slice(0, 40); if (pid && msg.data) h.onMsg(pid, msg.data); });
+      await all.attach();
+      pres.presence.subscribe('leave', m => h.onLeave && h.onLeave(m.clientId));
+      ready = true; clearTimeout(timer); h.onReady(transportOf(rt), tConn);
+    } catch (e) { h.onError('שגיאה בערוץ: ' + (e && e.message)); }
+  });
+  return {
+    sendTo(pid, o) { (outs[pid] = outs[pid] || rt.channels.get(base + ':p:' + pid)).publish('m', o).catch(e => h.onPubErr(e)); },
+    broadcast(o) { all.publish('b', o).catch(e => h.onPubErr(e)); },
+    ping: () => rt.connection.ping(),
+    transport: () => transportOf(rt),
+    close() { try { rt.close(); } catch (_) {} }
+  };
+}
+function makePhone(code, pid, h) {
+  const base = 'game:r' + code;
+  if (LOCAL) {
+    const bc = new BroadcastChannel('rt-' + code);
+    bc.onmessage = ev => { const m = ev.data; if (m && (m.to === pid || m.to === '*')) h.onMsg(m.d); };
+    setTimeout(() => h.onOpen({ name:'מקומי', host:'' }), 30);
+    return { send:o => bc.postMessage({ to:'host', from:pid, d:o }), close(){ bc.close(); } };
+  }
+  if (typeof AblyPubSub === 'undefined') { h.onError('ספריית התקשורת לא נטענה'); return null; }
+  const rt = ablyClient(pid);
+  const main = rt.channels.get(base), mine = rt.channels.get(base + ':p:' + pid), all = rt.channels.get(base + ':all'), pres = rt.channels.get(base + ':presence');
+  let opened = false;
+  const timer = setTimeout(() => { if (!opened) h.onError('אין חיבור לשרת אחרי 15 שניות. בדקו את האינטרנט ורעננו.'); }, 15000);
+  rt.connection.on(st => h.onState(st.current));
+  rt.connection.once('connected', async () => {
+    try {
+      const members = await pres.presence.get();
+      if (!members.some(m => m.data && m.data.host)) { clearTimeout(timer); h.onError('לא מצאתי את החדר עם הקוד הזה. בדקו את הקוד שעל הקיר.'); return; }
+      await mine.subscribe('m', m => h.onMsg(m.data));
+      await all.subscribe('b', m => h.onMsg(m.data));
+      await pres.presence.enter({});
+      opened = true; clearTimeout(timer); h.onOpen(transportOf(rt));
+    } catch (e) { h.onError('שגיאה: ' + (e && e.message)); }
+  });
+  return { send:o => { main.publish('up', o).catch(e => h.onPubErr && h.onPubErr(e)); }, transport:() => transportOf(rt), close(){ try { rt.close(); } catch (_) {} } };
+}
+
+/* ================= הקירות ================= */
+function startWall() {
+  document.body.className = 'wallmode';
+  $('stage').classList.remove('hidden');
+  const W = {
+    code:'', t:null, phones:new Map(), log:[], errors:[], csp:[], states:[], disc:0,
+    tConn:null, tr:null, pings:[], touches:0, taps:0, mv:0, mvSec:0, mvPeak:0, polls:[], pubErr:0, started:Date.now(), env:{}
+  };
+  let SC = 1, single = 0;
+
+  /* --- התאמה למסך ומקשים --- */
+  function fit() {
+    const st = $('stage'), vw = innerWidth, vh = innerHeight;
+    ['w1', 'w2', 'w3'].forEach((id, i) => { const el = $(id); el.style.display = (single && single !== i + 1) ? 'none' : ''; el.style.left = single ? '0px' : (i * 1920) + 'px'; });
+    const w = single ? 1920 : 5760;
+    st.style.width = w + 'px';
+    SC = Math.min(vw / w, vh / 1080);
+    st.style.transform = `translate(${(vw - w * SC) / 2}px,${(vh - 1080 * SC) / 2}px) scale(${SC})`;
+  }
+  addEventListener('resize', fit); fit();
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('dragstart', e => e.preventDefault());
+  const KEYMAP = { 'כ':'f', 'ר':'r', 'פ':'p', 'ג':'d', 'י':'h', 'א':'t' };
+  addEventListener('keydown', e => {
+    const k = (KEYMAP[e.key] || e.key).toLowerCase();
+    if ('0123'.includes(k)) { single = +k; fit(); }
+    else if (k === 'f') { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(err => addLog('מסך מלא נחסם: ' + err.message)); }
+    else if (k === 'r') location.reload();
+    else if (k === 'p') sendPoll();
+    else if (k === 'd') toggleReport();
+    else if (k === 'h') $('keys').classList.toggle('hidden');
+    else if (k === 't') simulate();
+  });
+
+  /* --- יומן --- */
+  function addLog(s) {
+    W.log.push(hhmm() + '  ' + s); if (W.log.length > 200) W.log.shift();
+    $('logl').innerHTML = W.log.slice(-21).map(x => '<div>' + esc(x) + '</div>').join('');
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  addEventListener('error', e => { W.errors.push(e.message); addLog('שגיאה: ' + e.message); renderChecks(); });
+  addEventListener('unhandledrejection', e => { const m = (e.reason && e.reason.message) || String(e.reason); W.errors.push(m); addLog('שגיאה: ' + m); });
+  document.addEventListener('securitypolicyviolation', e => { W.csp.push(e.violatedDirective + ' ' + e.blockedURI); addLog('חסימת אבטחה: ' + e.blockedURI); renderChecks(); });
+  setInterval(() => { $('clock').textContent = hhmm(); W.mvPeak = Math.max(W.mvPeak, W.mvSec); W.mvSec = 0; }, 1000);
+
+  /* --- בדיקות סביבה --- */
+  const E = W.env;
+  try { E.frame = window.self !== window.top ? 'כן' : 'לא'; } catch (_) { E.frame = 'כן (מאתר אחר)'; }
+  E.origin = location.origin === 'null' ? 'סגור (ארגז חול)' : location.origin;
+  E.ref = document.referrer ? new URL(document.referrer).host : '–';
+  try { localStorage.setItem('_t', '1'); localStorage.removeItem('_t'); E.store = 'פתוח'; } catch (_) { E.store = 'חסום'; }
+  const di = deviceInfo(); E.dev = di.dev + ' · ' + di.br; E.ua = di.ua;
+  E.win = innerWidth + '×' + innerHeight; E.scr = screen.width + '×' + screen.height; E.dpr = devicePixelRatio;
+  E.fs = document.fullscreenEnabled ? 'כן' : 'לא';
+  E.online = navigator.onLine ? 'כן' : 'לא';
+  try { const ac = new (window.AudioContext || window.webkitAudioContext)(); E.audio = ac.state === 'running' ? 'כן' : 'רק אחרי נגיעה'; ac.close(); } catch (_) { E.audio = 'לא זמין'; }
+  E.lib = typeof AblyPubSub !== 'undefined' ? (document.querySelector('script[src*="ably"]') ? 'נטענה מאתר חיצוני' : 'נטענה (מוטמעת בקובץ)') : 'לא נטענה';
+  E.ext = '⏳';
+  (async () => {
+    const t = now();
+    try {
+      const r = await fetch('https://cdn.jsdelivr.net/npm/@ably/pubsub-device@3.2.0/package.json', { cache:'no-store' });
+      E.ext = r.ok ? 'כן, ' + ms(now() - t) : 'תשובה ' + r.status;
+    } catch (e) { E.ext = 'נחסם (' + e.message + ')'; }
+    addLog('גישה לאתר חיצוני: ' + E.ext); renderChecks();
+  })();
+  addEventListener('online', () => { E.online = 'כן'; addLog('הדפדפן חזר לרשת'); renderChecks(); });
+  addEventListener('offline', () => { E.online = 'לא'; addLog('הדפדפן התנתק מהרשת'); renderChecks(); });
+
+  /* --- חיבור --- */
+  function connect() {
+    W.code = String(1000 + Math.floor(Math.random() * 9000));
+    $('code').textContent = W.code;
+    const base = LOCAL ? location.origin + location.pathname + '?tel&local&c=' : PHONE_URL + '?c=';
+    const joinUrl = base + W.code;
+    $('url').textContent = LOCAL ? 'בדיקה מקומית' : PHONE_URL.replace(/^https:\/\//, '').replace(/\/$/, '');
+    try { const q = qrcode(0, 'M'); q.addData(joinUrl); q.make(); $('qr').innerHTML = q.createSvgTag({ cellSize:8, margin:2, scalable:true }); }
+    catch (e) { $('qr').textContent = 'לא הצלחתי ליצור קוד סריקה'; }
+    addLog('מתחבר לשרת עם קוד ' + W.code);
+    W.t = makeHost(W.code, {
+      onReady: (tr, tConn) => { W.tr = tr; W.tConn = tConn; addLog('מחובר לשרת · ' + tr.name + ' · ' + ms(tConn)); renderChecks(); },
+      onError: msg => {
+        if (msg === 'taken') { W.t && W.t.close(); addLog('הקוד תפוס, בוחר קוד אחר'); connect(); return; }
+        W.errors.push(msg); addLog('⚠ ' + msg); renderChecks();
+      },
+      onState: (s, why) => {
+        W.states.push(hhmm() + ' ' + s);
+        if (s === 'disconnected' || s === 'suspended' || s === 'failed') { W.disc++; addLog('הקירות התנתקו מהשרת: ' + s + ' ' + why); }
+        else if (s === 'connected' && W.tConn != null) { addLog('הקירות חזרו לשרת'); W.tr = W.t.transport(); }
+        renderChecks();
+      },
+      onMsg, onLeave: pid => { const p = W.phones.get(pid); if (p && p.online) { p.online = false; addLog(p.name + ' יצא'); renderPhones(); renderChecks(); } },
+      onPubErr: e => { W.pubErr++; addLog('שליחה נכשלה: ' + (e && (e.code + ' ' + e.message))); }
+    });
+  }
+  setInterval(async () => {
+    if (!W.t || W.tConn == null) return;
+    try { const v = await W.t.ping(); W.pings.push(v); if (W.pings.length > 300) W.pings.shift(); renderChecks(); } catch (_) {}
+  }, 5000);
+
+  /* --- הודעות מהטלפונים --- */
+  function phoneOf(pid) {
+    let p = W.phones.get(pid);
+    if (!p) { p = { pid, name:'?', wall:1, color:COLORS[W.phones.size % COLORS.length], rtts:[], lost:0, msgs:0, disc:0, online:true, dev:'', tr:'' }; W.phones.set(pid, p); }
+    return p;
+  }
+  function onMsg(pid, m) {
+    if (!m || typeof m !== 'object') return;
+    const p = phoneOf(pid); p.msgs++; p.last = Date.now();
+    if (m.t === 'join') {
+      const was = p.online && p.name !== '?';
+      p.name = String(m.name || 'טלפון').slice(0, 12); p.wall = clampW(m.w); p.dev = String(m.dev || '').slice(0, 40); p.tr = String(m.tr || '').slice(0, 20);
+      if (m.disc) p.disc = m.disc;
+      p.online = true; p.ua = String(m.ua || '').slice(0, 200);
+      W.t.sendTo(pid, { t:'hi', color:p.color });
+      addLog((was ? 'חזר: ' : 'הצטרף: ') + p.name + ' · ' + p.dev + ' · ' + p.tr);
+    } else if (m.t === 'ping') {
+      W.t.sendTo(pid, { t:'pong', s:m.s, ts:m.ts });
+      if (typeof m.rtt === 'number') { p.rtts.push(m.rtt); if (p.rtts.length > 200) p.rtts.shift(); }
+      if (typeof m.lost === 'number') p.lost = m.lost;
+      if (typeof m.disc === 'number') p.disc = m.disc;
+      if (!p.online) { p.online = true; addLog(p.name + ' חזר'); }
+    } else if (m.t === 'tap') {
+      W.taps++; drawDot(p.wall, COLORS[m.c | 0] || p.color, p.name);
+    } else if (m.t === 'mv') {
+      W.mv++; W.mvSec++; moveCursor(p, +m.x, +m.y);
+    } else if (m.t === 'wall') {
+      p.wall = clampW(m.w); addLog(p.name + ' עבר לקיר ' + WALL_NAMES[p.wall]);
+    } else if (m.t === 'prcv') {
+      const pl = W.polls.find(x => x.id === m.id); if (pl && !pl.rcv[pid]) { pl.rcv[pid] = now() - pl.t; renderPoll(); }
+    } else if (m.t === 'pans') {
+      const pl = W.polls.find(x => x.id === m.id); if (pl && pl.ans[pid] == null) { pl.ans[pid] = { c:m.c | 0, dt:now() - pl.t }; renderPoll(); }
+    } else if (m.t === 'err') {
+      addLog('שגיאה בטלפון של ' + p.name + ': ' + String(m.msg).slice(0, 80));
+    }
+    renderPhones(); renderChecks();
+  }
+  const clampW = w => Math.max(0, Math.min(2, w | 0));
+  function layerOf(w) { return document.querySelector('.layer[data-w="' + w + '"]'); }
+  function drawDot(w, color, label, touch, x, y) {
+    const d = document.createElement('div'); d.className = 'dot' + (touch ? ' touch' : '');
+    if (!touch) d.style.background = color;
+    d.textContent = label;
+    d.style.left = ((x != null ? x : 150 + Math.random() * 1620) - 75) + 'px';
+    d.style.top = ((y != null ? y : 200 + Math.random() * 600) - 75) + 'px';
+    layerOf(w).appendChild(d); setTimeout(() => d.remove(), 8600);
+  }
+  function moveCursor(p, x, y) {
+    if (!(x >= 0 && x <= 1 && y >= 0 && y <= 1)) return;
+    if (!p.cur || p.curW !== p.wall) {
+      p.cur && p.cur.remove();
+      p.cur = document.createElement('div'); p.cur.className = 'cur'; p.cur.style.borderColor = p.color;
+      p.cur.innerHTML = '<span></span>'; p.cur.firstChild.textContent = p.name; p.curW = p.wall;
+      layerOf(p.wall).appendChild(p.cur);
+    }
+    p.cur.style.opacity = 1;
+    p.cur.style.left = (80 + x * 1760) + 'px'; p.cur.style.top = (170 + y * (LIMIT - 250)) + 'px';
+    clearTimeout(p.curT); p.curT = setTimeout(() => { if (p.cur) p.cur.style.opacity = 0; }, 2500);
+  }
+
+  /* --- מגע בקיר --- */
+  document.querySelectorAll('.wall').forEach((wl, i) => wl.addEventListener('pointerdown', e => {
+    if (e.target.closest('button')) return;
+    const r = wl.getBoundingClientRect(); const x = (e.clientX - r.left) / SC, y = (e.clientY - r.top) / SC;
+    if (y > LIMIT || y < 110) return;
+    W.touches++; drawDot(i, '', 'מגע', true, x, y); renderChecks();
+  }));
+
+  /* --- שאלה לטלפונים (שידור לכולם) --- */
+  function sendPoll() {
+    if (!W.t || W.tConn == null) { toast('אין עדיין חיבור לשרת'); return; }
+    const pl = { id:W.polls.length + 1, t:now(), rcv:{}, ans:{}, expect:[...W.phones.values()].filter(p => p.online).length };
+    W.polls.push(pl);
+    W.t.broadcast({ t:'poll', id:pl.id });
+    addLog('נשלחה שאלה מספר ' + pl.id + ' לכל הטלפונים');
+    $('qrbox').classList.add('hidden'); $('pollbox').classList.remove('hidden'); renderPoll();
+  }
+  function renderPoll() {
+    const pl = W.polls[W.polls.length - 1]; if (!pl) return;
+    const cnt = [0, 0, 0, 0]; Object.values(pl.ans).forEach(a => cnt[a.c]++);
+    const mx = Math.max(1, ...cnt);
+    $('pollh').textContent = 'שאלה מספר ' + pl.id + ': איזה צבע?';
+    $('pollbars').innerHTML = cnt.map((c, i) => `<div class="pbar"><i style="width:${Math.round(c / mx * 420)}px;background:${COLORS[i]}"></i>${c}</div>`).join('');
+    const rc = Object.values(pl.rcv), an = Object.values(pl.ans).map(a => a.dt);
+    $('pollinfo').innerHTML = `הגיעה ל־${rc.length} מתוך ${pl.expect} טלפונים<br>זמן הגעה ${ms(med(rc))}<br>ענו ${an.length} · זמן תשובה ${an.length ? (med(an) / 1000).toFixed(1) + ' שניות' : '–'}<br><span style="font-size:28px">סגירה בכפתור שלמטה</span>`;
+    renderChecks();
+  }
+  $('bPoll').onclick = () => { if (!$('pollbox').classList.contains('hidden')) { $('pollbox').classList.add('hidden'); $('qrbox').classList.remove('hidden'); $('bPoll').textContent = 'שאלה לטלפונים'; return; } sendPoll(); $('bPoll').textContent = 'סגירת השאלה'; };
+  $('bClear').onclick = () => document.querySelectorAll('.dot').forEach(d => d.remove());
+  $('bRep').onclick = toggleReport; $('reportClose').onclick = toggleReport;
+
+  function toast(s) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = s; $('w2').appendChild(t); setTimeout(() => t.remove(), 2500); }
+
+  /* --- תוצאות --- */
+  function stats() {
+    const ph = [...W.phones.values()];
+    const allR = ph.flatMap(p => p.rtts);
+    const lastPoll = W.polls[W.polls.length - 1];
+    const deliv = W.polls.reduce((a, pl) => { a.got += Object.keys(pl.rcv).length; a.exp += pl.expect; a.t.push(...Object.values(pl.rcv)); return a; }, { got:0, exp:0, t:[] });
+    return { ph, on:ph.filter(p => p.online).length, allR, deliv, lastPoll };
+  }
+  function renderChecks() {
+    const s = stats(), E = W.env;
+    const ok = (c, bad) => c ? '✅' : (bad ? '❌' : '⏳');
+    const rows = [
+      [E.frame === 'לא' ? '✅' : 'ℹ️', 'הדף רץ בתוך מסגרת של אתר אחר', E.frame],
+      [W.csp.length ? '❌' : '✅', 'חסימות אבטחה', W.csp.length ? W.csp.length + ' חסימות' : 'אין'],
+      [E.ext.startsWith('כן') ? '✅' : E.ext === '⏳' ? '⏳' : '❌', 'גישה לאתר חיצוני', E.ext],
+      [ok(W.tConn != null, W.errors.length && W.tConn == null), 'חיבור לשרת התקשורת', W.tConn != null ? ms(W.tConn) : (W.errors[0] || 'מתחבר...')],
+      [W.tr ? (W.tr.name === 'ווב-סוקט' ? '✅' : '⚠️') : '⏳', 'סוג הערוץ', W.tr ? W.tr.name : '–'],
+      [ok(W.pings.length), 'זמן תגובה של השרת', W.pings.length ? ms(med(W.pings)) + ' (הכי איטי ' + ms(Math.max(...W.pings)) + ')' : '–'],
+      [ok(s.ph.length), 'טלפונים מחוברים', s.on + (s.ph.length > s.on ? ' (עוד ' + (s.ph.length - s.on) + ' יצאו)' : '')],
+      [ok(s.allR.length), 'טלפון ← קירות ← טלפון', s.allR.length ? ms(med(s.allR)) + ' (הכי איטי ' + ms(Math.max(...s.allR)) + ')' : '–'],
+      [ok(s.deliv.got), 'שידור מהקירות לכל הטלפונים', W.polls.length ? s.deliv.got + ' מתוך ' + s.deliv.exp + ' הגיעו · ' + ms(med(s.deliv.t)) : 'עוד לא נשלחה שאלה'],
+      [ok(W.mv), 'זרם רציף (גרירה בטלפון)', W.mv ? 'שיא ' + W.mvPeak + ' הודעות בשנייה' : '–'],
+      [W.disc ? '⚠️' : '✅', 'ניתוקים של הקירות', W.disc + (W.pubErr ? ' · שליחות שנכשלו ' + W.pubErr : '')],
+      [ok(W.touches), 'מגע בקיר יחד עם הטלפונים', W.touches + ' נגיעות'],
+    ];
+    $('chk').innerHTML = rows.map(r => `<div class="row"><span>${r[0]} ${esc(r[1])}</span><span class="v">${esc(r[2])}</span></div>`).join('');
+  }
+  function renderPhones() {
+    const ph = [...W.phones.values()].filter(p => p.name !== '?');
+    $('pempty').classList.toggle('hidden', ph.length > 0);
+    $('ptb').innerHTML = ph.slice(-14).map(p => { const c = p.online ? '' : ' class="off"'; return `<tr><td${c}><span style="color:${p.color}">●</span> ${esc(p.name)}</td><td${c}>${esc(p.dev)}</td><td${c}>${WALL_NAMES[p.wall]}</td><td${c}>${esc(p.tr)}</td><td${c}>${ms(med(p.rtts))}</td><td${c}>${p.rtts.length ? ms(Math.max(...p.rtts)) : '–'}</td><td${c}>${p.msgs}</td><td${c}>${p.disc}${p.lost ? ' · אבדו ' + p.lost : ''}</td></tr>`; }).join('');
+  }
+
+  function reportText() {
+    const s = stats(), E = W.env, d = new Date();
+    const L = [];
+    L.push('דוח בדיקת תקשורת · ' + d.toLocaleDateString('he-IL') + ' ' + hhmm() + ' · משך ' + Math.round((Date.now() - W.started) / 60000) + ' דקות');
+    L.push('— סביבת הקירות —');
+    L.push('מכשיר ודפדפן: ' + E.dev);
+    L.push('בתוך מסגרת: ' + E.frame + ' · מקור הדף: ' + E.origin + ' · הגיע מ: ' + E.ref);
+    L.push('חלון: ' + E.win + ' · מסך: ' + E.scr + ' · יחס פיקסלים: ' + E.dpr + ' · מסך מלא אפשרי: ' + E.fs);
+    L.push('אחסון מקומי: ' + E.store + ' · צליל בלי נגיעה: ' + E.audio + ' · מקוון: ' + E.online);
+    L.push('חסימות אבטחה: ' + (W.csp.length ? W.csp.slice(0, 5).join(' | ') : 'אין'));
+    L.push('— רשת ושרת —');
+    L.push('ספריית תקשורת: ' + E.lib + ' · גישה לאתר חיצוני: ' + E.ext);
+    L.push('חיבור לשרת: ' + (W.tConn != null ? ms(W.tConn) : 'לא הצליח') + ' · ערוץ: ' + (W.tr ? W.tr.name : '–') + ' · שרת: ' + (W.tr ? W.tr.host : '–'));
+    L.push('זמן תגובה של השרת: ' + (W.pings.length ? 'חציון ' + ms(med(W.pings)) + ' · מהיר ' + ms(Math.min(...W.pings)) + ' · איטי ' + ms(Math.max(...W.pings)) + ' · ' + W.pings.length + ' מדידות' : '–'));
+    L.push('ניתוקים של הקירות: ' + W.disc + ' · שליחות שנכשלו: ' + W.pubErr);
+    L.push('— טלפונים (' + s.ph.length + ' התחברו, ' + s.on + ' מחוברים עכשיו) —');
+    s.ph.filter(p => p.name !== '?').forEach(p => L.push('• ' + p.name + ' · ' + p.dev + ' · ' + p.tr + ' · תגובה ' + ms(med(p.rtts)) + ' (איטי ' + (p.rtts.length ? ms(Math.max(...p.rtts)) : '–') + ', ' + p.rtts.length + ' מדידות) · אבדו ' + p.lost + ' · ניתוקים ' + p.disc + ' · הודעות ' + p.msgs));
+    L.push('כל הטלפונים יחד: ' + (s.allR.length ? 'חציון ' + ms(med(s.allR)) + ' · 90% מתחת ל־' + ms([...s.allR].sort((a, b) => a - b)[Math.floor(s.allR.length * 0.9)]) : '–'));
+    L.push('— פעולות —');
+    L.push('שאלות לכולם: ' + W.polls.length + ' · הגיעו ' + s.deliv.got + ' מתוך ' + s.deliv.exp + ' · זמן הגעה ' + ms(med(s.deliv.t)));
+    L.push('לחיצות צבע: ' + W.taps + ' · הודעות גרירה: ' + W.mv + ' (שיא ' + W.mvPeak + ' בשנייה) · נגיעות בקיר: ' + W.touches);
+    L.push('שגיאות: ' + (W.errors.length ? W.errors.slice(0, 5).join(' | ') : 'אין'));
+    L.push('זיהוי דפדפן: ' + E.ua);
+    return L.join('\n');
+  }
+  function toggleReport() {
+    const r = $('report');
+    if (r.classList.contains('hidden')) {
+      const txt = reportText(); r.textContent = txt; r.classList.remove('hidden'); $('reportClose').classList.remove('hidden'); $('btns').classList.add('hidden'); $('w2').classList.add('rep');
+      if (W.t && W.tConn != null) { W.t.broadcast({ t:'rep', txt }); addLog('הדוח נשלח לטלפונים'); }
+    } else { $('w2').classList.remove('rep'); r.classList.add('hidden'); $('reportClose').classList.add('hidden'); $('btns').classList.remove('hidden'); }
+  }
+
+  /* --- הדמיה מקומית לבדיקה --- */
+  function simulate() {
+    if (!LOCAL) { toast('הדמיה זמינה רק בבדיקה מקומית'); return; }
+    ['נועה', 'איתי', 'מאיה'].forEach((n, i) => {
+      const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;width:400px;height:700px;opacity:0;pointer-events:none';
+      f.src = location.pathname + '?tel&local&auto=' + encodeURIComponent(n) + '&w=' + i + '&c=' + W.code; document.body.appendChild(f);
+    });
+  }
+
+  renderChecks(); renderPhones(); connect();
+  addLog('הדף נטען · ' + E.dev);
+}
+
+/* ================= הטלפון ================= */
+function startPhone() {
+  document.body.className = 'phonemode';
+  $('phone').classList.remove('hidden');
+  const store = { get(k){ try { return localStorage.getItem(k); } catch (_) { return null; } }, set(k, v){ try { localStorage.setItem(k, v); } catch (_) {} } };
+  let pid = store.get('rt-pid'); if (!pid) { pid = 'u' + Math.random().toString(36).slice(2, 11); store.set('rt-pid', pid); }
+  if (params.has('auto')) pid = 'sim' + Math.random().toString(36).slice(2, 8);
+  const P = { t:null, wall:1, seq:0, pend:{}, lost:0, disc:0, rtt:null, joined:false, color:'#fff', poll:0, info:deviceInfo(), tr:'' };
+  const show = id => ['p-join', 'p-main', 'p-poll', 'p-rep'].forEach(x => $(x).classList.toggle('hidden', x !== id));
+  $('p-code').value = params.get('c') || '';
+  $('p-name').value = store.get('rt-name') || '';
+  function pickWall(w) { P.wall = w; document.querySelectorAll('.wallpick button').forEach(b => b.classList.toggle('sel', +b.dataset.w === w)); $('p-wl').textContent = 'קיר ' + WALL_NAMES[w]; }
+  document.querySelectorAll('#p-walls button').forEach(b => b.onclick = () => pickWall(+b.dataset.w));
+  document.querySelectorAll('#p-walls2 button').forEach(b => b.onclick = () => { pickWall(+b.dataset.w); P.t && P.t.send({ t:'wall', w:P.wall }); });
+  pickWall(1);
+  COLORS.forEach((c, i) => { const b = document.createElement('button'); b.style.background = c; b.onclick = () => P.t && P.t.send({ t:'tap', c:i }); $('p-colors').appendChild(b); });
+  COLORS.slice(0, 4).forEach((c, i) => { const b = document.createElement('button'); b.style.background = c; b.onclick = () => { P.t.send({ t:'pans', id:P.poll, c:i }); show('p-main'); }; $('p-pollc').appendChild(b); });
+  addEventListener('error', e => P.t && P.t.send({ t:'err', msg:e.message }));
+
+  // משטח גרירה – שולח עד 15 הודעות בשנייה
+  const pad = $('pad'); let lastSend = 0, pendMv = null, mvTimer = null;
+  function sendMv() { if (pendMv && P.t) { P.t.send({ t:'mv', x:pendMv[0], y:pendMv[1] }); lastSend = now(); pendMv = null; } }
+  function onPad(e) {
+    const r = pad.getBoundingClientRect();
+    pendMv = [Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), Math.max(0, Math.min(1, (e.clientY - r.top) / r.height))];
+    pendMv = [+pendMv[0].toFixed(3), +pendMv[1].toFixed(3)];
+    const wait = 66 - (now() - lastSend);
+    if (wait <= 0) sendMv(); else { clearTimeout(mvTimer); mvTimer = setTimeout(sendMv, wait); }
+  }
+  pad.addEventListener('pointerdown', e => { pad.setPointerCapture(e.pointerId); onPad(e); });
+  pad.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') onPad(e); });
+
+  function join() {
+    const code = $('p-code').value.trim(), name = $('p-name').value.trim();
+    if (!/^\d{4}$/.test(code)) { $('p-err').textContent = 'הקלידו את הקוד בן 4 הספרות שעל הקיר'; return; }
+    if (!name) { $('p-err').textContent = 'כתבו שם'; return; }
+    store.set('rt-name', name); P.name = name; P.code = code; $('p-me').textContent = name;
+    $('p-err').textContent = 'מתחבר...'; $('p-go').disabled = true;
+    P.t0 = now();
+    P.t = makePhone(code, pid, {
+      onOpen: tr => {
+        P.tr = tr.name; P.tConn = now() - P.t0;
+        P.t.send({ t:'join', name, w:P.wall, dev:P.info.dev + ' · ' + P.info.br, tr:tr.name, ua:P.info.ua, disc:P.disc });
+        P.joined = true; $('p-led').className = 'led on'; show('p-main'); diag();
+      },
+      onMsg,
+      onState: s => {
+        if (!P.joined) return;
+        if (s === 'disconnected' || s === 'suspended') { P.disc++; $('p-led').className = 'led off'; $('p-rtt').textContent = 'מנותק, מנסה שוב...'; }
+        else if (s === 'connected') { $('p-led').className = 'led on'; P.tr = P.t.transport().name; P.t.send({ t:'join', name:P.name, w:P.wall, dev:P.info.dev + ' · ' + P.info.br, tr:P.tr, ua:P.info.ua, disc:P.disc }); diag(); }
+      },
+      onError: msg => { if (P.joined) return; $('p-err').textContent = msg; $('p-go').disabled = false; }
+    });
+  }
+  $('p-go').onclick = join;
+
+  function onMsg(m) {
+    if (!m || typeof m !== 'object') return;
+    if (m.t === 'hi') { P.color = m.color; $('p-me').style.color = m.color; }
+    else if (m.t === 'pong') { if (P.pend[m.s]) { delete P.pend[m.s]; P.rtt = now() - m.ts; $('p-rtt').textContent = 'זמן תגובה: ' + Math.round(P.rtt) + ' מ״ש'; } }
+    else if (m.t === 'poll') { P.poll = m.id; P.t.send({ t:'prcv', id:m.id }); show('p-poll'); if (params.has('auto')) setTimeout(() => $('p-pollc').children[Math.floor(Math.random() * 4)].click(), 400 + Math.random() * 1500); }
+    else if (m.t === 'rep') { $('p-reptxt').value = m.txt; show('p-rep'); }
+  }
+  // מדידת זמן תגובה כל 2 שניות: טלפון ← קירות ← טלפון
+  setInterval(() => {
+    if (!P.joined) return;
+    const t = now();
+    Object.keys(P.pend).forEach(s => { if (t - P.pend[s] > 5000) { delete P.pend[s]; P.lost++; } });
+    P.seq++; P.pend[P.seq] = t;
+    P.t.send({ t:'ping', s:P.seq, ts:t, rtt:P.rtt, lost:P.lost, disc:P.disc });
+  }, 2000);
+  function diag() { $('p-diag').textContent = P.info.dev + ' · ' + P.info.br + ' · ערוץ ' + P.tr + ' · התחברות ' + Math.round(P.tConn) + ' מ״ש'; }
+
+  $('p-repcopy').onclick = async () => {
+    const ta = $('p-reptxt');
+    try { await navigator.clipboard.writeText(ta.value); $('p-repcopy').textContent = 'הועתק ✓'; }
+    catch (_) { ta.select(); try { document.execCommand('copy'); $('p-repcopy').textContent = 'הועתק ✓'; } catch (__) { $('p-repcopy').textContent = 'סמנו והעתיקו ידנית'; } }
+  };
+  $('p-repclose').onclick = () => show('p-main');
+
+  // הדמיה אוטומטית (לבדיקה מקומית בלבד)
+  if (params.has('auto')) {
+    $('p-name').value = params.get('auto'); pickWall(+params.get('w') || 0); join();
+    setInterval(() => P.joined && $('p-colors').children[Math.floor(Math.random() * 6)].click(), 2500 + Math.random() * 2000);
+    let a = Math.random() * 6;
+    setInterval(() => { if (!P.joined) return; a += 0.12; P.t.send({ t:'mv', x:+(0.5 + 0.4 * Math.cos(a)).toFixed(3), y:+(0.5 + 0.4 * Math.sin(a * 1.3)).toFixed(3) }); }, 70);
+  }
+}
+
+IS_PHONE ? startPhone() : startWall();
+</script>
+</body>
+</html>
