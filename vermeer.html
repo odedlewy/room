@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="author" content="© 2026 עודד לוי · כל הזכויות שמורות">
+<title>מבצע ורמיר · מוזיאון לאמנות מגניבה</title>
+<!-- מבצע ורמיר · דף הטלפון · © 2026 עודד לוי · כל הזכויות שמורות -->
+<script src="https://cdn.jsdelivr.net/npm/@ably/pubsub-device@3.2.0/dist/cdn/ably.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#1b2944;color:#fff;font-family:"Heebo","Arial Hebrew","Segoe UI",Arial,sans-serif;-webkit-tap-highlight-color:transparent;user-select:none}
+body{display:flex;flex-direction:column}
+header{background:#101a2f;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;font-size:17px}
+header b{color:#f2c14e;font-size:19px}
+.led{display:inline-block;width:12px;height:12px;border-radius:50%;background:#e04848;margin-inline-start:6px}.led.on{background:#3fbf7f}
+main{flex:1;display:flex;flex-direction:column;justify-content:center;padding:22px;gap:16px;text-align:center}
+h1{font-size:30px;color:#f2c14e}
+p{font-size:21px;line-height:1.45}
+input{width:100%;font-size:24px;padding:14px;border-radius:14px;border:none;text-align:center;font-family:inherit}
+button{font-weight:700;font-size:22px;font-family:inherit;padding:18px;border-radius:16px;border:none;background:#f2c14e;color:#1b2944;box-shadow:0 5px 0 rgba(0,0,0,.35)}
+button:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+button.sec{background:#4a6596;color:#fff}
+button.sel{outline:4px solid #fff}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.hidden{display:none!important}
+.err{color:#ff8a8a;min-height:26px;font-size:18px}
+.opts{display:flex;flex-direction:column;gap:12px}
+.timerbar{height:8px;background:#f2c14e;border-radius:4px;transition:width 1s linear}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;direction:ltr}
+.keys button{font-size:28px;padding:16px 0}
+.disp{background:#0d1426;border-radius:12px;font-size:38px;font-weight:700;color:#f2c14e;padding:12px;letter-spacing:6px;direction:ltr;min-height:66px}
+#pad{position:relative;margin:0 auto;width:min(86vw,360px);aspect-ratio:555/650;background:#0d1426;border:3px solid #f2c14e;border-radius:14px;touch-action:none}
+#dot{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:5px solid #f2c14e;left:50%;top:50%}
+.reply{background:#fff;color:#1b2944;border-radius:18px;padding:18px;font-size:21px;text-align:right}
+.reply b{display:block;color:#4a6596;margin-bottom:6px}
+.flash{animation:fl 1s}
+@keyframes fl{0%{background:#f2c14e}100%{background:#1b2944}}
+footer{font-size:12px;opacity:.4;text-align:center;padding:6px}
+</style>
+</head>
+<body>
+<header><span>🏛️ <b>מוזיאון לאמנות מגניבה</b></span><span id="me"></span><span class="led" id="led"></span></header>
+<main id="join">
+  <h1>ברוכים הבאים למוזיאון</h1>
+  <p>כתבו את השם הפרטי שלכם (או כינוי)</p>
+  <input id="name" maxlength="20" placeholder="השם שלי">
+  <p>איפה אתם בפעילות?</p>
+  <div class="row"><button class="sec" id="rP" data-r="player">🔍 ליד הקירות</button><button class="sec sel" id="rA" data-r="aud">💻 בקהל</button></div>
+  <input id="code" inputmode="numeric" maxlength="4" placeholder="קוד מהקיר (4 ספרות)">
+  <button id="go">כניסה</button>
+  <div class="err" id="err"></div>
+  <p style="font-size:15px;opacity:.6">השם משמש רק בזמן הפעילות ולא נשמר בשום מקום אחריה.</p>
+</main>
+<main id="app" class="hidden"></main>
+<footer>© 2026 עודד לוי · כל הזכויות שמורות</footer>
+<script>
+/* מבצע ורמיר · דף הטלפון · © 2026 עודד לוי · כל הזכויות שמורות */
+'use strict';
+const ABLY_KEY='vL085Q.1JUw5w:HUpVZFcB748qPlSMjFPHAavjrmX5cfvCqKChNEgwbsw';
+const params=new URLSearchParams(location.search);const LOCAL=params.has('local');
+const $=id=>document.getElementById(id);
+const store={get(k){try{return sessionStorage.getItem(k);}catch(_){return null;}},set(k,v){try{sessionStorage.setItem(k,v);}catch(_){}}};
+let pid=store.get('vm-pid');if(!pid){pid='u'+Math.random().toString(36).slice(2,11);store.set('vm-pid',pid);}
+if(params.has('auto'))pid='a'+Math.random().toString(36).slice(2,9);
+let role='aud',T=null,joined=false,curKey='',wake=null;
+$('code').value=params.get('c')||'';$('name').value=store.get('vm-name')||'';
+[$('rP'),$('rA')].forEach(b=>b.onclick=()=>{role=b.dataset.r;$('rP').classList.toggle('sel',role==='player');$('rA').classList.toggle('sel',role==='aud');});
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function makePhone(code,h){const base='game:v'+code;
+  if(LOCAL){const bc=new BroadcastChannel('vm-'+code);bc.onmessage=ev=>{const m=ev.data;if(m&&(m.to===pid||m.to==='*'))h.onMsg(m.d);};setTimeout(()=>h.onOpen(),40);return{send:o=>bc.postMessage({to:'host',from:pid,d:o})};}
+  if(typeof AblyPubSub==='undefined'){h.onError('אין חיבור (הספרייה לא נטענה). רעננו את הדף.');return null;}
+  const rt=AblyPubSub.createClient({key:ABLY_KEY,clientId:pid,echoMessages:false,disconnectedRetryTimeout:3000});
+  const main=rt.channels.get(base),mine=rt.channels.get(base+':p:'+pid),all=rt.channels.get(base+':all'),pres=rt.channels.get(base+':presence');let opened=false;
+  const timer=setTimeout(()=>{if(!opened)h.onError('אין חיבור לשרת. בדקו את האינטרנט ונסו שוב.');},15000);
+  rt.connection.on(st=>h.onState&&h.onState(st.current));
+  rt.connection.once('connected',async()=>{try{const mem=await pres.presence.get();if(!mem.some(m=>m.data&&m.data.host)){clearTimeout(timer);h.onError('לא מצאתי פעילות עם הקוד הזה. בדקו את הקוד שעל הקיר.');return;}
+    await mine.subscribe('m',m=>h.onMsg(m.data));await all.subscribe('b',m=>h.onMsg(m.data));await pres.presence.enter({});opened=true;clearTimeout(timer);h.onOpen();}catch(e){h.onError('שגיאת חיבור');}});
+  return{send:o=>main.publish('up',o).catch(()=>{})};}
+async function keepAwake(){try{if('wakeLock' in navigator){wake=await navigator.wakeLock.request('screen');}}catch(_){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&joined){keepAwake();T&&T.send({t:'join',name:store.get('vm-name'),role});}});
+$('go').onclick=()=>{const code=$('code').value.trim(),name=$('name').value.trim();
+  if(!/^\d{4}$/.test(code)){$('err').textContent='הקלידו את הקוד בן 4 הספרות שעל הקיר';return;}
+  if(!name){$('err').textContent='כתבו שם';return;}
+  store.set('vm-name',name);$('err').textContent='מתחבר...';$('go').disabled=true;keepAwake();
+  T=makePhone(code,{onOpen:()=>{joined=true;$('led').classList.add('on');T.send({t:'join',name,role});$('join').classList.add('hidden');$('app').classList.remove('hidden');render({kind:'wait',title:'נכנסתם למוזיאון!',text:'הסתכלו על הקירות'});},
+    onMsg,onState:s=>{if(!joined)return;$('led').classList.toggle('on',s==='connected');if(s==='connected')T.send({t:'join',name,role});},
+    onError:m=>{if(joined)return;$('err').textContent=m;$('go').disabled=false;}});};
+function onMsg(m){if(!m||typeof m!=='object')return;
+  if(m.t==='hi'){$('me').textContent=(m.role==='player'?'🔍 ':'💻 ')+m.name;}
+  else if(m.t==='mode'){const key=JSON.stringify(m.m)+(m.hint?'h':'');if(key===curKey)return;curKey=key;render(m.m,m.hint);notify();}}
+function notify(){document.body.classList.remove('flash');void document.body.offsetWidth;document.body.classList.add('flash');try{navigator.vibrate&&navigator.vibrate([120,60,120]);}catch(_){}}
+function render(m,hint){const a=$('app');let h='';
+  if(m.kind==='wait'){h='<h1>'+esc(m.title||'')+'</h1><p>'+esc(m.text||'')+'</p>';if(hint)h+='<button class="sec" id="hint">💡 לשלוח רמז לחוקרים (פעם אחת לשלב)</button>';a.innerHTML=h;if(hint)$('hint').onclick=()=>{T.send({t:'hint'});$('hint').remove();};}
+  else if(m.kind==='vote'){h='<h1>הצבעה</h1><p>'+esc(m.q)+'</p><div class="opts">'+m.opts.map((o,i)=>'<button data-i="'+i+'">'+esc(o)+'</button>').join('')+'</div><p style="font-size:15px;opacity:.7">ההצבעה סודית</p>';a.innerHTML=h;
+    a.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{T.send({t:'vote',id:m.id,opt:+b.dataset.i});a.innerHTML='<h1>ההצבעה נקלטה</h1><p>תודה! הסתכלו על הקירות.</p>';});}
+  else if(m.kind==='num'||m.kind==='code'){const len=m.kind==='num'?2:(m.len||4);let v='';
+    a.innerHTML='<h1>'+(m.kind==='num'?'תשובה':'קוד')+'</h1><p>'+esc(m.q)+'</p><div class="disp" id="disp">·</div><div class="keys">'+['1','2','3','4','5','6','7','8','9','⌫','0','✓'].map(c=>'<button class="'+(c==='✓'?'':'sec')+'" data-c="'+c+'">'+c+'</button>').join('')+'</div>';
+    const show=()=>{$('disp').textContent=v||'·';};
+    a.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const c=b.dataset.c;if(c==='⌫')v=v.slice(0,-1);else if(c==='✓'){if(!v)return;
+      if(m.kind==='num'){T.send({t:'num',id:m.id,val:+v});a.innerHTML='<h1>התשובה נקלטה</h1><p>הסתכלו על הקירות.</p>';return;}
+      T.send({t:'code',id:m.id,val:v});v='';$('disp').textContent='נשלח ✓';return;}else if(v.length<len)v+=c;show();});}
+  else if(m.kind==='tip'){a.innerHTML='<h1>שליחת ממצא למוזיאון</h1><p>'+esc(m.q)+'</p><div class="opts">'+m.opts.map((o,i)=>'<button data-i="'+i+'">'+esc(o)+'</button>').join('')+'</div>';
+    a.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{T.send({t:'tip',id:m.id,opt:+b.dataset.i});a.innerHTML='<h1>נשלח</h1><p>מחכים לתשובה מהמוזיאון...</p>';});}
+  else if(m.kind==='reply'){a.innerHTML='<h1>תשובה מהמוזיאון</h1><div class="reply"><b>'+esc(m.from)+'</b>'+esc(m.text)+'</div>';}
+  else if(m.kind==='lens'){a.innerHTML='<h1>'+(m.k===0?'זכוכית על המקור':'זכוכית על ההעתק')+'</h1><p>הזיזו את האצבע – הזכוכית זזה על הקיר</p><div id="pad"><div id="dot"></div></div><button id="mark">סמן</button>';
+    const pad=$('pad'),dot=$('dot');let last=0,pend=null,tm=null;
+    const send=()=>{if(pend){T.send({t:'lens',k:m.k,x:pend[0],y:pend[1]});last=performance.now();pend=null;}};
+    const mv=e=>{const r=pad.getBoundingClientRect();const x=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));dot.style.left=(x*100)+'%';dot.style.top=(y*100)+'%';pend=[+x.toFixed(3),+y.toFixed(3)];
+      const w=70-(performance.now()-last);if(w<=0)send();else{clearTimeout(tm);tm=setTimeout(send,w);}};
+    pad.addEventListener('pointerdown',e=>{pad.setPointerCapture(e.pointerId);mv(e);});pad.addEventListener('pointermove',e=>{if(e.buttons||e.pointerType==='touch')mv(e);});
+    $('mark').onclick=()=>T.send({t:'mark',k:m.k});}
+}
+if(params.has('auto')){$('name').value=params.get('auto');if(params.get('role')==='player')$('rP').click();$('go').click();
+  setInterval(()=>{const b=[...$('app').querySelectorAll('[data-i]')];if(b.length&&Math.random()<.5)b[Math.floor(Math.random()*b.length)].click();
+    const k=[...$('app').querySelectorAll('[data-c]')];if(k.length&&Math.random()<.4){k.find(x=>x.dataset.c==='3').click();k.find(x=>x.dataset.c==='✓').click();}},1500);}
+</script>
+</body>
+</html>
