@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="author" content="© 2026 עודד לוי · כל הזכויות שמורות">
+<title>חוקרי הנס</title>
+<!-- חוקרי הנס · דף הטלפון · © 2026 עודד לוי · כל הזכויות שמורות -->
+<script src="https://cdn.jsdelivr.net/npm/@ably/pubsub-device@3.2.0/dist/cdn/ably.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;background:#1b2944;color:#fff;font-family:"Heebo","Arial Hebrew","Segoe UI",Arial,sans-serif;-webkit-tap-highlight-color:transparent;user-select:none}
+body{display:flex;flex-direction:column;min-height:100vh}
+header{background:#101a2f;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;font-size:17px}
+header b{color:#f2c14e;font-size:19px}
+.led{display:inline-block;width:12px;height:12px;border-radius:50%;background:#e04848;margin-inline-start:6px}.led.on{background:#3fbf7f}
+main{flex:1;display:flex;flex-direction:column;justify-content:center;padding:22px;gap:16px;text-align:center}
+h1{font-size:30px;color:#f2c14e}
+p{font-size:21px;line-height:1.45}
+input{width:100%;font-size:24px;padding:14px;border-radius:14px;border:none;text-align:center;font-family:inherit}
+button{font-weight:700;font-size:22px;font-family:inherit;padding:18px;border-radius:16px;border:none;background:#f2c14e;color:#1b2944;box-shadow:0 5px 0 rgba(0,0,0,.35)}
+button:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+button.sec{background:#4a6596;color:#fff}
+.hidden{display:none!important}
+.err{color:#ff8a8a;min-height:26px;font-size:18px}
+.opts{display:flex;flex-direction:column;gap:12px}
+#clue{margin:14px 14px 0;background:#f7ecd0;color:#3b2a12;border:4px solid #c9a45c;border-radius:18px;padding:14px 16px;text-align:center}
+#clue b{display:block;color:#8a6a2a;font-size:17px;margin-bottom:4px}
+#clue span{font-size:21px;font-weight:700;line-height:1.4}
+#clue i{display:block;font-style:normal;font-size:15px;margin-top:6px;color:#8a6a2a}
+.note{font-size:18px;color:#ffb3b3}
+.flash{animation:fl 1s}
+@keyframes fl{0%{background:#f2c14e}100%{background:#1b2944}}
+footer{font-size:12px;opacity:.4;text-align:center;padding:6px}
+</style>
+</head>
+<body>
+<header><span>🕯️ <b>חוקרי הנס</b></span><span id="me"></span><span class="led" id="led"></span></header>
+<div id="clue" class="hidden"><b>🔒 הראיה הסודית שלך</b><span id="clueTxt"></span><i>שמרו אותה בסוד עד העימות</i></div>
+<main id="join">
+  <h1>ברוכים הבאים לחקירה</h1>
+  <p>כתבו את השם הפרטי שלכם (או כינוי)</p>
+  <input id="name" maxlength="20" placeholder="השם שלי">
+  <input id="code" inputmode="numeric" maxlength="4" placeholder="קוד מהקיר (4 ספרות)">
+  <button id="go">כניסה</button>
+  <div class="err" id="err"></div>
+  <p style="font-size:15px;opacity:.6">השם משמש רק בזמן הפעילות ולא נשמר בשום מקום אחריה.</p>
+</main>
+<main id="app" class="hidden"></main>
+<footer>© 2026 עודד לוי · כל הזכויות שמורות</footer>
+<script>
+/* חוקרי הנס · דף הטלפון · © 2026 עודד לוי · כל הזכויות שמורות */
+'use strict';
+const ABLY_KEY='vL085Q.1JUw5w:HUpVZFcB748qPlSMjFPHAavjrmX5cfvCqKChNEgwbsw';
+const params=new URLSearchParams(location.search);const LOCAL=params.has('local');
+const $=id=>document.getElementById(id);
+const store={get(k){try{return sessionStorage.getItem(k);}catch(_){return null;}},set(k,v){try{sessionStorage.setItem(k,v);}catch(_){}}};
+let pid=store.get('hn-pid');if(!pid){pid='u'+Math.random().toString(36).slice(2,11);store.set('hn-pid',pid);}
+if(params.has('auto'))pid='a'+Math.random().toString(36).slice(2,9);
+let T=null,joined=false,curKey='',curMode=null,wake=null,clueIdx=null;
+$('code').value=params.get('c')||'';$('name').value=store.get('hn-name')||'';
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function makePhone(code,h){const base='game:h'+code;
+  if(LOCAL){const bc=new BroadcastChannel('hn-'+code);bc.onmessage=ev=>{const m=ev.data;if(m&&(m.to===pid||m.to==='*'))h.onMsg(m.d);};setTimeout(()=>h.onOpen(),40);return{send:o=>bc.postMessage({to:'host',from:pid,d:o})};}
+  if(typeof AblyPubSub==='undefined'){h.onError('אין חיבור (הספרייה לא נטענה). רעננו את הדף.');return null;}
+  const rt=AblyPubSub.createClient({key:ABLY_KEY,clientId:pid,echoMessages:false,disconnectedRetryTimeout:3000});
+  const main=rt.channels.get(base),mine=rt.channels.get(base+':p:'+pid),pres=rt.channels.get(base+':presence');let opened=false;
+  const timer=setTimeout(()=>{if(!opened)h.onError('אין חיבור לשרת. בדקו את האינטרנט ונסו שוב.');},15000);
+  rt.connection.on(st=>h.onState&&h.onState(st.current));
+  rt.connection.once('connected',async()=>{try{const mem=await pres.presence.get();if(!mem.some(m=>m.data&&m.data.host)){clearTimeout(timer);h.onError('לא מצאתי פעילות עם הקוד הזה. בדקו את הקוד שעל הקיר.');return;}
+    await mine.subscribe('m',m=>h.onMsg(m.data));await pres.presence.enter({});opened=true;clearTimeout(timer);h.onOpen();}catch(e){h.onError('שגיאת חיבור');}});
+  return{send:o=>main.publish('up',o).catch(()=>{})};}
+async function keepAwake(){try{if('wakeLock' in navigator){wake=await navigator.wakeLock.request('screen');}}catch(_){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&joined){keepAwake();T&&T.send({t:'join',name:store.get('hn-name')});}});
+$('go').onclick=()=>{const code=$('code').value.trim(),name=$('name').value.trim();
+  if(!/^\d{4}$/.test(code)){$('err').textContent='הקלידו את הקוד בן 4 הספרות שעל הקיר';return;}
+  if(!name){$('err').textContent='כתבו שם';return;}
+  store.set('hn-name',name);$('err').textContent='מתחבר...';$('go').disabled=true;keepAwake();
+  T=makePhone(code,{onOpen:()=>{joined=true;$('led').classList.add('on');T.send({t:'join',name});$('join').classList.add('hidden');$('app').classList.remove('hidden');render({kind:'wait',title:'נכנסתם לחקירה!',text:'הסתכלו על הקירות'});},
+    onMsg,onState:s=>{if(!joined)return;$('led').classList.toggle('on',s==='connected');if(s==='connected')T.send({t:'join',name});},
+    onError:m=>{if(joined)return;$('err').textContent=m;$('go').disabled=false;}});};
+function onMsg(m){if(!m||typeof m!=='object')return;
+  if(m.t==='hi'){$('me').textContent='🔍 '+m.name;}
+  else if(m.t==='clue'){clueIdx=m.idx;$('clueTxt').textContent=m.text;$('clue').classList.remove('hidden');notify();}
+  else if(m.t==='clueDone'){clueIdx=null;$('clue').classList.add('hidden');curKey='';render({kind:'wait',title:'הראיה נחשפה!',text:'כל הכבוד. הסתכלו על הקירות.'});notify();}
+  else if(m.t==='wrong'){if(curMode)render(curMode,'העד אמר: "זה לא שלי". נסו עד אחר.');}
+  else if(m.t==='mode'){const key=JSON.stringify(m.m);if(key===curKey)return;curKey=key;render(m.m);notify();}}
+function notify(){document.body.classList.remove('flash');void document.body.offsetWidth;document.body.classList.add('flash');try{navigator.vibrate&&navigator.vibrate([120,60,120]);}catch(_){}}
+function render(m,note){const a=$('app');curMode=m;
+  if(m.kind==='wait'){a.innerHTML='<h1>'+esc(m.title||'')+'</h1><p>'+esc(m.text||'')+'</p>';}
+  else if(m.kind==='vote'){a.innerHTML='<h1>בחירה</h1><p>'+esc(m.q)+'</p><div class="opts">'+m.opts.map((o,i)=>'<button data-i="'+i+'">'+esc(o)+'</button>').join('')+'</div><p style="font-size:15px;opacity:.7">הבחירה סודית</p>';
+    a.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{T.send({t:'vote',id:m.id,opt:+b.dataset.i});a.innerHTML='<h1>הבחירה נקלטה</h1><p>תודה! הסתכלו על הקירות.</p>';});}
+  else if(m.kind==='send'){a.innerHTML='<h1>הגיע הזמן!</h1><p>למי מהעדים הראיה שלכם שייכת?</p>'+(note?'<p class="note">'+esc(note)+'</p>':'')+'<div class="opts">'+m.opts.map((o,i)=>'<button data-w="'+i+'">'+esc(o)+'</button>').join('')+'</div>';
+    a.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{T.send({t:'send',w:+b.dataset.w});a.innerHTML='<h1>הראיה נשלחה</h1><p>הסתכלו על הקיר של העד...</p>';});}
+}
+if(params.has('auto')){$('name').value=params.get('auto');$('go').click();
+  setInterval(()=>{const b=[...$('app').querySelectorAll('[data-i],[data-w]')];if(b.length&&Math.random()<.5)b[Math.floor(Math.random()*b.length)].click();},1500);}
+</script>
+</body>
+</html>
